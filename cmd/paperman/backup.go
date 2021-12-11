@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/sewiti/paperman/internal/atomicfs"
+	"github.com/sewiti/paperman/pkg/atomicfs"
 )
 
 func backup(srvDir, name string) error {

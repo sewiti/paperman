@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/sewiti/paperman/internal/atomicfs"
 	"github.com/sewiti/paperman/internal/conf"
+	"github.com/sewiti/paperman/pkg/atomicfs"
 )
 
 //go:embed template/server.properties

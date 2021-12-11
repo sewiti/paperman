@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sewiti/paperman/internal/atomicfs"
+	"github.com/sewiti/paperman/pkg/atomicfs"
 	"github.com/sewiti/paperman/pkg/papermc"
 )
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/sewiti/paperman/internal/atomicfs"
+	"github.com/sewiti/paperman/pkg/atomicfs"
 )
 
 func Write(path string, values Values) error {
