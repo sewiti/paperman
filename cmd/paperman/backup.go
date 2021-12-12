@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"time"
 
 	"github.com/sewiti/paperman/internal/server"
@@ -20,6 +18,7 @@ func backup(ctx context.Context, srvDir, name string) error {
 		return err
 	}
 	if running {
+		fmt.Printf("%s is running, turning off world saving for the backup\n", name)
 		screen := screen.Screen("paperman-" + name)
 		err := screen.SendStuffContext(ctx, "save-off")
 		if err != nil {
@@ -49,54 +48,39 @@ func backup(ctx context.Context, srvDir, name string) error {
 		return fmt.Errorf("%s is a file", instBackups)
 	}
 
-	fname := time.Now().Format("2006-01-02_15:04:05") + ".tar.gz"
+	fname := time.Now().Format(server.BackupTimeLayout) + ".tar.gz"
 	path := filepath.Join(instBackups, fname)
 
-	cmd := exec.CommandContext(ctx, "tar", "czf", path, "-C", instDir, "--exclude", server.BackupsDir, ".")
+	fmt.Printf("Creating backup %s\n", path)
+	cmd := exec.CommandContext(ctx, "tar", "cvzf", path, "-C", instDir, "--exclude", server.BackupsDir, ".")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
 		return err
 	}
 	fmt.Printf("Created %s\n", path)
+
+	if running {
+		fmt.Println("Re-enabling world saving") // it's deferred
+	}
 	return nil
 }
 
-func purgeBackups(srcDir, name string, count int) error {
-	instBackups := filepath.Join(srvDir, name, server.BackupsDir)
-
-	backups, err := os.ReadDir(instBackups)
+func purgeBackups(srvDir, name string, count int) error {
+	srv, err := server.Read(filepath.Join(srvDir, name))
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
 		return err
 	}
-	type pair struct {
-		backup  fs.DirEntry
-		modTime time.Time
-	}
-	pairs := make([]pair, 0, len(backups))
-	for _, backup := range backups {
-		stat, err := os.Stat(filepath.Join(instBackups, backup.Name()))
+	for i, b := range srv.Backups {
+		if i+count >= len(srv.Backups) {
+			break // Leave `count` Backups
+		}
+		err = os.Remove(b.Path)
 		if err != nil {
 			return err
 		}
-		pairs = append(pairs, pair{
-			backup:  backup,
-			modTime: stat.ModTime(),
-		})
-	}
-	sort.Slice(pairs, func(i, j int) bool {
-		return pairs[i].modTime.Before(pairs[j].modTime)
-	})
-
-	for i := 0; i < len(pairs)-count; i++ {
-		file := filepath.Join(instBackups, pairs[i].backup.Name())
-		err = os.Remove(file)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Deleted %s\n", file)
+		fmt.Printf("Deleted %s\n", b.Path)
 	}
 	return nil
 }

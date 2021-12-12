@@ -15,6 +15,7 @@ import (
 )
 
 func (s Server) Launch(ctx context.Context, cwd string) error {
+	fmt.Printf("Launching %s...\n", s.Name)
 	_, err := os.Stat(cwd)
 	if err != nil {
 		return err
@@ -22,7 +23,10 @@ func (s Server) Launch(ctx context.Context, cwd string) error {
 
 	java := s.Java
 	if java == "" {
-		java = "java"
+		java, err = exec.LookPath("java")
+		if err != nil {
+			return err
+		}
 	}
 	jar := s.Jar
 	if jar == "" {
@@ -41,18 +45,20 @@ func (s Server) Launch(ctx context.Context, cwd string) error {
 	args := append(s.JavaArgs, "-jar", jar)
 	args = append(args, s.JarArgs...)
 
+	fmt.Printf("%s %s\n", java, strings.Join(args, " "))
 	cmd := exec.Command(java, args...)
 	cmd.Dir = cwd
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if err = cmd.Start(); err != nil {
+	if err = cmd.Run(); err != nil {
 		return err
 	}
-	return cmd.Wait()
+	return nil
 }
 
 func autoUpgrade(ctx context.Context, dir, version string) (jar string, err error) {
+	fmt.Println("Checking for newer version")
 	ver, err := papermc.GetVersion(ctx, "paper", version)
 	if err != nil {
 		return "", err
@@ -65,6 +71,7 @@ func autoUpgrade(ctx context.Context, dir, version string) (jar string, err erro
 
 	_, err = os.Stat(filepath.Join(dir, jar))
 	if err == nil {
+		fmt.Printf("Already latest %s\n", jar)
 		return jar, nil // already latest
 	}
 	if !os.IsNotExist(err) {
@@ -72,6 +79,7 @@ func autoUpgrade(ctx context.Context, dir, version string) (jar string, err erro
 	}
 	// new version/build
 
+	fmt.Printf("Downloading %s...\n", jar)
 	r, err := papermc.Download(ctx, "paper", version, build)
 	if err != nil {
 		return "", err
@@ -109,7 +117,9 @@ filesLoop:
 				continue filesLoop
 			}
 		}
-		err = os.Remove(filepath.Join(dir, file.Name()))
+		jar := filepath.Join(dir, file.Name())
+		fmt.Printf("Deleting %s\n", jar)
+		err = os.Remove(jar)
 		if err != nil {
 			return err
 		}

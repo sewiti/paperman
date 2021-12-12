@@ -11,7 +11,7 @@ import (
 )
 
 //go:embed template/server.properties
-var srvPropsTpl string
+var defaultPropertiesTpl []byte
 
 func Create(srvDir, name, version, port string) error {
 	err := os.MkdirAll(filepath.Join(srvDir, name), 0750)
@@ -20,7 +20,15 @@ func Create(srvDir, name, version, port string) error {
 	}
 
 	// server.properties
-	tpl, err := template.New(Properties).Parse(srvPropsTpl)
+	bs, err := os.ReadFile(Properties)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		bs = defaultPropertiesTpl
+	}
+
+	tpl, err := template.New(Properties).Parse(string(bs))
 	if err != nil {
 		return err
 	}
@@ -50,6 +58,8 @@ func Create(srvDir, name, version, port string) error {
 	}
 
 	// eula.txt
-	err = atomicfs.WriteFile(filepath.Join(srvDir, name, "eula.txt"), []byte("eula=true"), 0640)
+	err = conf.Write(filepath.Join(srvDir, name, "eula.txt"), conf.Values{
+		"eula": {"true"},
+	})
 	return err
 }

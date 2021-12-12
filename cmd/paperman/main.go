@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,9 +17,9 @@ import (
 	"github.com/sewiti/paperman/pkg/screen"
 )
 
-const srvDir = "servers"
-
 func main() {
+	const srvDir = "/opt/paperman/servers"
+
 	requireNArgs(os.Args, 1)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -42,15 +41,19 @@ func main() {
 	case "send":
 		requireNArgs(os.Args, 3)
 		name := os.Args[2]
-		screen := screen.Screen("paperman-" + name)
+		screen := server.Screen(name)
 		stuff := strings.Join(os.Args[3:], " ") + "\x0f"
-		fmt.Printf("%q\n", stuff)
 		err = screen.SendStuffContext(ctx, stuff)
+		if err != nil {
+			break
+		}
+		fmt.Println("Command sent")
 
 	case "launch":
 		requireNArgs(os.Args, 2)
 		name := os.Args[2]
-		srv, err := server.Read(filepath.Join(srvDir, name))
+		var srv server.Server
+		srv, err = server.Read(filepath.Join(srvDir, name))
 		if err != nil {
 			break
 		}
@@ -64,49 +67,64 @@ func main() {
 	case "backups-purge":
 		requireNArgs(os.Args, 3)
 		name := os.Args[2]
-		count, err := strconv.Atoi(os.Args[3])
+		var count int
+		count, err = strconv.Atoi(os.Args[3])
 		if err != nil {
 			break
 		}
 		err = purgeBackups(srvDir, name, count)
 
 	case "restore":
-		fmt.Println("not implemented yet")
-		os.Exit(1)
-		// requireNArgs(os.Args, 3)
-		// name := os.Args[2]
-		// backupFile := os.Args[3]
-		// err = restore(srvDir, name, backupFile)
+		requireNArgs(os.Args, 3)
+		name := os.Args[2]
+		backupFile := os.Args[3]
+
+		confirmation := fmt.Sprintf("Yes, restore %s", name)
+		fmt.Printf("Are you sure you want to restore %q? This will delete current data. [%s]: ", name, confirmation)
+		var cont bool
+		cont, err = promptConfirm(os.Stdin, confirmation)
+		if err != nil {
+			break
+		}
+		if !cont {
+			fmt.Println("Restore aborted")
+			break
+		}
+		err = restore(ctx, srvDir, name, backupFile)
 
 	case "delete":
 		requireNArgs(os.Args, 2)
 		name := os.Args[2]
-
 		dir := filepath.Join(srvDir, name)
-		delPrompt := fmt.Sprintf("Yes, delete %s", name)
-		fmt.Printf("Are you sure you want to delete %q? [%s]: ", dir, delPrompt)
-		sc := bufio.NewScanner(os.Stdin)
-		if !sc.Scan() {
-			err = errors.New("unable to read stdin")
-			break
-		}
-		err = sc.Err()
+
+		confirmation := fmt.Sprintf("Yes, delete %s", name)
+		fmt.Printf("Are you sure you want to delete %q? [%s]: ", dir, confirmation)
+		var cont bool
+		cont, err = promptConfirm(os.Stdin, confirmation)
 		if err != nil {
 			break
 		}
-		if sc.Text() != delPrompt {
+		if !cont {
 			fmt.Println("Deletion aborted")
-			return
+			break
+		}
+		var enabled bool
+		enabled, err = server.Server{Name: name}.IsEnabledStandalone(ctx)
+		if err != nil {
+			break
+		}
+		if enabled {
+			systemControl("disable", name)
 		}
 		err = os.RemoveAll(dir)
 
 	case "list":
-		var ss []screen.Screen
-		ss, err = screen.ListContext(ctx, "paperman-")
+		var running []screen.Screen
+		running, err = screen.ListContext(ctx, "paperman-")
 		if err != nil {
 			break
 		}
-		err = listInstances(os.Stdout, server.FilterScreens(ss), srvDir)
+		err = listInstances(os.Stdout, running, srvDir)
 
 	case "install":
 		err = install()
@@ -126,6 +144,7 @@ func main() {
 	}
 
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s: ", os.Args[1])
 		if eerr, ok := err.(*exec.ExitError); ok {
 			fmt.Fprintf(os.Stderr, "%s: %s", eerr.Error(), string(eerr.Stderr))
 			os.Exit(1)
@@ -164,4 +183,13 @@ func printHelp(w io.Writer) {
 		"  disable NAME\t: Disable instance service\n"
 
 	fmt.Fprintf(w, help, os.Args[0])
+}
+
+func promptConfirm(r io.Reader, confirmation string) (bool, error) {
+	sc := bufio.NewScanner(r)
+	sc.Scan()
+	if sc.Err() != nil {
+		return false, sc.Err()
+	}
+	return sc.Text() == confirmation, nil
 }
