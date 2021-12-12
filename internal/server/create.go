@@ -14,7 +14,7 @@ import (
 var srvPropsTpl string
 
 func Create(srvDir, name, version, port string) error {
-	err := os.Mkdir(filepath.Join(srvDir, name), 0750)
+	err := os.MkdirAll(filepath.Join(srvDir, name), 0750)
 	if err != nil {
 		return err
 	}

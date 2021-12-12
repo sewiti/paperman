@@ -1,0 +1,27 @@
+[Unit]
+Description=Paperman Instance %i
+Requires=network.target local-fs.target
+After=network.target local-fs.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/paperman
+
+User=paperman
+Group=paperman
+PrivateUsers=true
+
+ProtectHome=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+ExecStart=/usr/bin/screen -DmS "paperman-%i" ./paperman launch "%i"
+ExecStop=/usr/bin/screen -S "paperman-%i" -p 0 -X eval 'stuff "stop"\\015'
+
+Restart=on-failure
+RestartSec=60s
+
+[Install]
+WantedBy=multi-user.target

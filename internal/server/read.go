@@ -11,6 +11,7 @@ import (
 const (
 	PapermanConf = "paperman.conf"
 	Properties   = "server.properties"
+	BackupsDir   = "backups"
 )
 
 func ReadAll(dirPath string) ([]Server, error) {
@@ -42,15 +43,18 @@ func Read(path string) (Server, error) {
 	if err != nil {
 		return Server{}, err
 	}
+	backups, _ := os.ReadDir(filepath.Join(path, BackupsDir))
 
 	port, err := strconv.Atoi(props.Get("server-port"))
 	if err != nil {
 		return Server{}, err
 	}
 	return Server{
-		Name:     filepath.Base(path),
-		Port:     port,
-		Version:  paper.Get("papermc-version"),
+		Name:    filepath.Base(path),
+		Port:    port,
+		Version: paper.Get("papermc-version"),
+		Backups: len(backups),
+
 		Java:     paper.Get("java"),
 		JavaArgs: paper["java-args"],
 		Jar:      paper.Get("jar"),

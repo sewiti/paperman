@@ -33,11 +33,7 @@ func (s Server) Launch(ctx context.Context, cwd string) error {
 		}
 
 		// delete old jars
-		relJar, err := filepath.Rel(cwd, jar)
-		if err != nil {
-			return err
-		}
-		err = deleteFiles(cwd, "paper-", ".jar", relJar)
+		err = deleteFiles(cwd, "paper-", ".jar", jar)
 		if err != nil {
 			return err
 		}
@@ -45,7 +41,7 @@ func (s Server) Launch(ctx context.Context, cwd string) error {
 	args := append(s.JavaArgs, "-jar", jar)
 	args = append(args, s.JarArgs...)
 
-	cmd := exec.CommandContext(ctx, java, args...)
+	cmd := exec.Command(java, args...)
 	cmd.Dir = cwd
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -65,9 +61,9 @@ func autoUpgrade(ctx context.Context, dir, version string) (jar string, err erro
 		return "", errors.New("no builds found")
 	}
 	build := ver.Builds[len(ver.Builds)-1] // get latest build
-	jar = filepath.Join(dir, fmt.Sprintf("paper-%s-%d.jar", version, build))
+	jar = fmt.Sprintf("paper-%s-%d.jar", version, build)
 
-	_, err = os.Stat(jar)
+	_, err = os.Stat(filepath.Join(dir, jar))
 	if err == nil {
 		return jar, nil // already latest
 	}
@@ -81,7 +77,7 @@ func autoUpgrade(ctx context.Context, dir, version string) (jar string, err erro
 		return "", err
 	}
 	defer r.Close()
-	f, err := atomicfs.NewWriter(jar, 0640)
+	f, err := atomicfs.NewWriter(filepath.Join(dir, jar), 0640)
 	if err != nil {
 		return "", err
 	}

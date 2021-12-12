@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sewiti/paperman/pkg/tmux"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,25 +12,26 @@ func Test_listServers(t *testing.T) {
 	tests := []struct {
 		name      string
 		path      string
-		sessions  []tmux.Session
+		running   []string
 		want      string
 		assertion assert.ErrorAssertionFunc
 	}{
 		{
 			name: "servers list",
 			path: filepath.Join("testdata", "list"),
-			sessions: []tmux.Session{
+			running: []string{
 				"gopher",
 			},
-			want: "Name  \tVersion\tPort\n" +
-				"gopher\t 1.18.1\t25588\tRunning\n" +
-				"lemur \t   1.18\t25565\n",
+			want: "" +
+				"NAME  \t PORT\tVERSION\tRUNNING\tBACKUPS\n" +
+				"gopher\t25588\t1.18.1 \t    yes\t      0\n" +
+				"lemur \t25565\t1.18   \t     no\t      0\n",
 			assertion: assert.NoError,
 		},
 		{
 			name: "no servers",
 			path: filepath.Join("testdata", "emptylist"),
-			sessions: []tmux.Session{
+			running: []string{
 				"gopher",
 			},
 			want:      "No servers found\n",
@@ -41,7 +41,7 @@ func Test_listServers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sb := strings.Builder{}
-			tt.assertion(t, listServers(&sb, tt.sessions, tt.path))
+			tt.assertion(t, listInstances(&sb, tt.running, tt.path))
 			assert.Equal(t, tt.want, sb.String())
 		})
 	}
